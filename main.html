@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lotto Links</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+         :root {
+            --bg: #0f1724;
+            /* deep navy */
+            --card: #0b1220;
+            --muted: #9aa4b2;
+            --accent: #7c5cff;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-2: rgba(255, 255, 255, 0.02);
+            --success: #22c55e;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+            color-scheme: dark;
+        }
+        
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: linear-gradient(180deg, #071028 0%, #071a2a 60%);
+        }
+        
+        .wrap {
+            max-width: 1000px;
+            margin: 48px auto;
+            padding: 28px;
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+            box-shadow: 0 6px 30px rgba(2, 6, 23, 0.6);
+            backdrop-filter: blur(6px);
+        }
+        
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px
+        }
+        
+        h1 {
+            font-size: 20px;
+            margin: 0;
+            color: #e6eef8
+        }
+        
+        p.lead {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+        
+        .search {
+            background: var(--glass);
+            border: 1px solid var(--glass-2);
+            padding: 8px 12px;
+            border-radius: 10px;
+            color: var(--muted);
+            min-width: 220px
+        }
+        
+        .search:focus {
+            outline: 2px solid rgba(124, 92, 255, 0.18);
+            border-color: var(--accent);
+            color: #fff
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px
+        }
+        
+        thead th {
+            display: none
+        }
+        
+        tbody tr {
+            transition: transform .18s ease, background .18s ease;
+        }
+        
+        tbody tr:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03)
+        }
+        
+        td {
+            padding: 14px 12px
+        }
+        
+        .link-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+        
+        .favicon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: var(--accent);
+            flex: 0 0 40px
+        }
+        
+        a.card-link {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 10px;
+            text-decoration: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+            color: #eaf0ff;
+        }
+        
+        a.card-link .title {
+            font-weight: 600
+        }
+        /* meta 그리드: [라벨][값][라벨][값] */
+        
+        .meta-grid {
+            display: grid;
+            grid-template-columns: auto 1fr auto 1fr;
+            gap: 6px 10px;
+            align-items: center;
+            margin-top: 8px
+        }
+        
+        .meta-k {
+            color: var(--muted);
+            font-size: 12px
+        }
+        
+        .meta-v {
+            font-size: 12px;
+            background: var(--glass);
+            border: 1px solid var(--glass-2);
+            padding: 6px 8px;
+            border-radius: 8px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none
+        }
+        
+        .meta-v:hover {
+            border-color: rgba(124, 92, 255, 0.22)
+        }
+        
+        .meta-v:active {
+            transform: translateY(1px)
+        }
+        
+        .meta-v .hint {
+            opacity: .7;
+            font-size: 11px
+        }
+        
+        .meta-v.copied {
+            border-color: rgba(34, 197, 94, .35);
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, .15) inset
+        }
+        /* responsive */
+        
+        @media (min-width:720px) {
+            thead th {
+                display: table-cell;
+                color: var(--muted);
+                font-size: 13px;
+                padding: 8px 12px
+            }
+            td:first-child {
+                width: 64px
+            }
+        }
+        
+        .empty {
+            padding: 40px;
+            text-align: center;
+            color: var(--muted)
+        }
+        
+        .foot {
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: right
+        }
+        /* 토스트 */
+        
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 28px;
+            transform: translateX(-50%);
+            background: #111827;
+            color: #e5e7eb;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease
+        }
+        
+        .toast.show {
+            opacity: 1
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap" role="main">
+        <header>
+            <div>
+                <h1>Links</h1>
+                <p class="lead"></p>
+            </div>
+            <div class="controls">
+                <input id="filter" class="search" placeholder="검색어로 필터링 — 예: docs, news" aria-label="Filter links" />
+            </div>
+        </header>
+
+        <table aria-describedby="description">
+            <caption id="description" style="display:none">링크 목록. 각 행은 단일 클릭 가능한 링크로 구성됩니다.</caption>
+            <thead>
+                <tr>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody id="links">
+                <tr>
+                    <td>
+                        <a class="card-link" href="https://cenlots-ui.cloit.dev/auth/login" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">DEV</div>
+                                <div>
+                                    <span class="title">DEV Portal</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="gypil@itcen.com" title="클릭해서 복사">gypil@itcen.com </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="http://43.200.141.5:8082/users/sign_in" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">GH</div>
+                                <div>
+                                    <span class="title">GitHub</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="pilgamyong" title="클릭해서 복사">pilgamyong</span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="01083613001" title="클릭해서 복사">01083613001</span>
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlots" title="클릭해서 복사">cenlots</span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123!</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="https://cenlots-jenkins.cloit.dev/" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">JE</div>
+                                <div>
+                                    <span class="title">jenkins</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlots" title="클릭해서 복사">cenlots </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="https://webmail.cengroup.co.kr/index.ds" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">WE</div>
+                                <div>
+                                    <span class="title">WebMail</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlots" title="클릭해서 복사">cenlotaws@itcen.com</span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123!</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="http://43.200.141.5:9000" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">SN</div>
+                                <div>
+                                    <span class="title">sonarqube</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlots" title="클릭해서 복사">cenlots </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="https://aws.amazon.com/ko/console/" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">AW</div>
+                                <div>
+                                    <span class="title">aws 관련 cenlots</span>
+                                    <!-- 1행 -->
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="shpark1@sicc.co.kr" title="클릭해서 복사">shpark1@sicc.co.kr </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                        <!-- 2행 -->
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlotaws@itcen.com" title="클릭해서 복사">cenlotaws@itcen.com </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="http://a4869f199a5f340fdb0a01f76d23d61f-1421675397.ap-northeast-2.elb.amazonaws.com/?orgId=1" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">GF</div>
+                                <div>
+                                    <span class="title">Grafana</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="admin" title="클릭해서 복사">admin </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="!sicc123" title="클릭해서 복사">!sicc123 </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <a class="card-link" href="https://www.figma.com/design/RNuQU3OBslBL98vllpmOau/cenlotaws?node-id=0-1&t=5OVOyVRQYyzX2rAo-1" target="_blank" rel="noopener noreferrer">
+                            <div class="link-cell">
+                                <div class="favicon">SN</div>
+                                <div>
+                                    <span class="title">figma</span>
+                                    <div class="meta-grid">
+                                        <span class="meta-k">ID</span>
+                                        <span class="meta-v" data-copy="cenlotaws@itcen.com" title="클릭해서 복사">cenlotaws@itcen.com </span>
+                                        <span class="meta-k">PW</span>
+                                        <span class="meta-v" data-copy="Cenlotaws123!" title="클릭해서 복사">Cenlotaws123! </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div id="empty" class="empty" hidden>검색 결과가 없습니다.</div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        (function() {
+            const input = document.getElementById('filter');
+            const tbody = document.getElementById('links');
+            const empty = document.getElementById('empty');
+            const toast = document.getElementById('toast');
+
+            input.addEventListener('input', () => {
+                const q = input.value.trim().toLowerCase();
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                let shown = 0;
+                rows.forEach(r => {
+                    const text = r.innerText.toLowerCase();
+                    const match = q === '' || text.includes(q);
+                    r.style.display = match ? '' : 'none';
+                    if (match) shown++;
+                });
+                empty.hidden = shown > 0;
+            });
+
+            // keyboard shortcut: / to focus search
+            window.addEventListener('keydown', (e) => {
+                if (e.key === '/' && document.activeElement !== input) {
+                    e.preventDefault();
+                    input.focus();
+                }
+            });
+
+            // 클릭-복사 핸들러 (위임)
+            document.addEventListener('click', async(e) => {
+                const target = e.target.closest('.meta-v');
+                if (!target) return;
+                // 링크 이동 막기 (상위 a.card-link 클릭 방지)
+                e.preventDefault();
+                e.stopPropagation();
+                const value = target.getAttribute('data-copy');
+                if (!value) return;
+                try {
+                    await navigator.clipboard.writeText(value);
+                    target.classList.add('copied');
+                    showToast('복사됨: ' + mask(value));
+                    setTimeout(() => target.classList.remove('copied'), 900);
+                } catch (err) {
+                    showToast('복사 실패. 수동으로 복사하세요.');
+                }
+            });
+
+            function showToast(msg) {
+                toast.textContent = msg;
+                toast.classList.add('show');
+                clearTimeout(showToast._t);
+                showToast._t = setTimeout(() => toast.classList.remove('show'), 1200);
+            }
+
+            // 민감값 토스트에는 일부만 노출
+            function mask(v) {
+                if (!v) return '';
+                if (v.includes('@')) {
+                    const [id, dom] = v.split('@');
+                    return id.slice(0, 3) + '***@' + dom;
+                }
+                return v.length > 4 ? v.slice(0, 2) + '***' : '***';
+            }
+        })();
+    </script>
+</body>
+
+</html>

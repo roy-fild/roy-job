@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>CamelCasing Converter (jQuery)</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+         :root {
+            --gap: 16px;
+            --bd: #e5e7eb;
+            --bg: #f9fafb;
+            --fg: #111827;
+            --muted: #6b7280;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, Malgun Gothic, sans-serif;
+            color: var(--fg);
+            background: var(--bg);
+        }
+        
+        .wrap {
+            max-width: 1100px;
+            margin: 32px auto;
+            padding: 0 16px;
+        }
+        
+        h1 {
+            font-size: 20px;
+            margin: 0 0 12px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--gap);
+        }
+        
+        .panel {
+            background: #fff;
+            border: 1px solid var(--bd);
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .03);
+        }
+        
+        .panel header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--bd);
+        }
+        
+        .panel header .title {
+            font-weight: 600;
+        }
+        
+        .panel header .hint {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 56vh;
+            border: 0;
+            resize: vertical;
+            padding: 12px 14px;
+            line-height: 1.5;
+            font-size: 14px;
+            outline: none;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        button {
+            border: 1px solid var(--bd);
+            background: #fff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        button:hover {
+            background: #f3f4f6;
+        }
+        
+        .footer {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        @media (max-width:900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            textarea {
+                height: 42vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>SCREAMING_SNAKE → camelCase 변환기</h1>
+        <div class="grid">
+            <!-- LEFT: input -->
+            <section class="panel">
+                <header>
+                    <span class="title">입력</span>
+                    <div class="hint">줄마다 하나씩: 예) <code>TCKT_NO</code>, <code>GM_ID</code>, <code>GM_RND</code></div>
+                    <div class="btns">
+                        <button id="clearInBtn" type="button">지우기</button>
+                    </div>
+                </header>
+                <textarea id="in" placeholder="여기에 줄단위로 입력하세요.&#10;대소문자 상관없이 자동 변환됩니다."></textarea>
+            </section>
+
+            <!-- RIGHT: output -->
+            <section class="panel">
+                <header>
+                    <span class="title">결과 (camelCase)</span>
+                    <div class="btns">
+                        <button id="copyBtn" type="button">복사</button>
+                        <button id="clearOutBtn" type="button">지우기</button>
+                    </div>
+                </header>
+                <textarea id="out" placeholder="여기에 결과가 표시됩니다." readonly></textarea>
+            </section>
+        </div>
+        <div class="footer">Tip: 붙여넣기만 해도 자동 변환됩니다.</div>
+    </div>
+
+    <script>
+        function toCamelCase(str) {
+            if (!str) return "";
+            const parts = str
+                .trim()
+                .replace(/[^\p{L}\p{N}]+/gu, " ")
+                .split(" ")
+                .filter(Boolean);
+            if (parts.length === 0) return "";
+            const head = parts[0].toLowerCase();
+            const tail = parts.slice(1).map(w => {
+                const lower = w.toLowerCase();
+                if (/^\d/.test(lower)) return lower;
+                return lower.charAt(0).toUpperCase() + lower.slice(1);
+            });
+            return [head, ...tail].join("");
+        }
+
+        function convertLines(text) {
+            const lines = text.split(/\r?\n/);
+            return lines.map(line => line.trim() ? toCamelCase(line) : "").join("\n");
+        }
+
+        let timer = null;
+        $("#in").on("input", function() {
+            clearTimeout(timer);
+            const val = this.value;
+            timer = setTimeout(() => {
+                $("#out").val(convertLines(val));
+            }, 80);
+        });
+
+        // 초기 샘플
+        $("#in").val([
+            "TCKT_NO",
+            "GM_ID",
+            "GM_RND",
+            "TCKT_GM_COL_NO"
+        ].join("\n")).trigger("input");
+
+        $("#copyBtn").on("click", async function() {
+            const text = $("#out").val();
+            try {
+                await navigator.clipboard.writeText(text);
+                $(this).text("복사됨!");
+                setTimeout(() => $(this).text("복사"), 900);
+            } catch {
+                const $tmp = $("<textarea>").css({
+                    position: "fixed",
+                    left: "-9999px"
+                }).val(text).appendTo("body");
+                $tmp[0].select();
+                document.execCommand("copy");
+                $tmp.remove();
+            }
+        });
+
+        $("#clearInBtn").on("click", () => {
+            $("#in").val("").trigger("input");
+        });
+        $("#clearOutBtn").on("click", () => {
+            $("#out").val("");
+        });
+    </script>
+</body>
+
+</html>
