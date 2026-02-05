@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JSON Viewer (jQuery)</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+         :root {
+            --bg: #0b1020;
+            --panel: #111836;
+            --line: #263058;
+            --text: #e9ecff;
+            --muted: #aab3da;
+            --bad: #ff5a7a;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
+            background: var(--bg);
+            color: var(--text);
+        }
+        
+        header {
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        header .title {
+            font-weight: 700;
+            letter-spacing: .2px;
+        }
+        
+        header .hint {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        .wrap {
+            padding: 16px 18px;
+            display: grid;
+            gap: 14px;
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        @media (max-width: 980px) {
+            .wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+        }
+        
+        .card .hd {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        
+        .card .hd .label {
+            font-weight: 650;
+        }
+        
+        .card .bd {
+            padding: 12px 14px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 320px;
+            resize: vertical;
+            background: rgba(255, 255, 255, .04);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            outline: none;
+        }
+        
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        button,
+        input[type="text"] {
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .06);
+            color: var(--text);
+            padding: 9px 11px;
+            font-size: 13px;
+        }
+        
+        button {
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, .10);
+        }
+        
+        button.primary {
+            background: rgba(80, 140, 255, .25);
+            border-color: rgba(80, 140, 255, .55);
+        }
+        
+        button.primary:hover {
+            background: rgba(80, 140, 255, .35);
+        }
+        
+        .status {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        
+        .status.bad {
+            color: var(--bad);
+        }
+        
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+        
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: rgba(255, 255, 255, .04);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            overflow: auto;
+            max-height: 420px;
+        }
+        /* Tree */
+        
+        .tree {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 13px;
+        }
+        
+        .node {
+            margin-left: 18px;
+            border-left: 1px dashed rgba(170, 179, 218, .25);
+            padding-left: 10px;
+        }
+        
+        .item {
+            margin: 3px 0;
+        }
+        
+        .toggle {
+            cursor: pointer;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .caret {
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 6px solid var(--muted);
+            display: inline-block;
+            transform: rotate(0deg);
+            transition: .12s;
+        }
+        
+        .caret.open {
+            transform: rotate(90deg);
+        }
+        
+        .k {
+            color: #9bdcff;
+        }
+        
+        .t {
+            color: #ffd479;
+        }
+        
+        .s {
+            color: #b8ffb0;
+        }
+        
+        .n {
+            color: #ffb4d9;
+        }
+        
+        .b {
+            color: #c5b8ff;
+        }
+        
+        .null {
+            color: #ff8d8d;
+        }
+        
+        .pill {
+            font-size: 11px;
+            color: var(--muted);
+            border: 1px solid rgba(170, 179, 218, .28);
+            padding: 2px 7px;
+            border-radius: 999px;
+        }
+        
+        mark {
+            background: rgba(255, 210, 90, .22);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 0 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div>
+            <div class="title">JSON 문자열 뷰어</div>
+            <div class="hint">붙여넣기/업로드 → 자동 파싱 → Pretty + Tree + 검색</div>
+        </div>
+        <div class="row">
+            <span class="pill">jQuery</span>
+            <span class="pill">Pretty Print</span>
+            <span class="pill">Tree</span>
+            <span class="pill">Search</span>
+        </div>
+    </header>
+
+    <div class="wrap">
+        <!-- Input -->
+        <section class="card">
+            <div class="hd">
+                <div class="label">입력(JSON 문자열)</div>
+                <div class="row">
+                    <input id="file" type="file" accept=".json,application/json,text/plain" />
+                    <button id="btnSample">샘플</button>
+                    <button id="btnClear">지우기</button>
+                </div>
+            </div>
+            <div class="bd">
+                <textarea id="in" placeholder='여기에 JSON 문자열을 붙여넣어 주세요.
+예) {"a":1,"b":[true,null,"hi"]}'></textarea>
+                <div class="row" style="margin-top:10px; justify-content:space-between;">
+                    <div class="row">
+                        <button class="primary" id="btnParse">파싱/정렬</button>
+                        <button id="btnMinify">Minify</button>
+                        <button id="btnCopyPretty">Pretty 복사</button>
+                        <button id="btnCopyMin">Minify 복사</button>
+                    </div>
+                    <div id="status" class="status">대기 중</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Output -->
+        <section class="card">
+            <div class="hd">
+                <div class="label">출력</div>
+                <div class="row">
+                    <input id="q" type="text" placeholder="키/값 검색 (예: userId)" />
+                    <button id="btnExpand">전체 펼치기</button>
+                    <button id="btnCollapse">전체 접기</button>
+                </div>
+            </div>
+            <div class="bd" style="display:grid; gap:12px;">
+                <div>
+                    <div class="status" style="margin-bottom:6px;">Pretty JSON</div>
+                    <pre id="pretty" class="mono"></pre>
+                </div>
+                <div>
+                    <div class="status" style="margin-bottom:6px;">Tree View</div>
+                    <div id="tree" class="tree"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function() {
+            const $in = $("#in");
+            const $status = $("#status");
+            const $pretty = $("#pretty");
+            const $tree = $("#tree");
+            const $q = $("#q");
+
+            let lastObj = null;
+            let expanded = true;
+
+            function setStatus(ok, msg) {
+                $status.toggleClass("bad", !ok).text(msg);
+            }
+
+            // JSON.parse error position extraction (best-effort)
+            function parseWithNiceError(text) {
+                try {
+                    return {
+                        ok: true,
+                        obj: JSON.parse(text)
+                    };
+                } catch (e) {
+                    const m = String(e.message || e).match(/position\s+(\d+)/i);
+                    const pos = m ? Number(m[1]) : null;
+                    return {
+                        ok: false,
+                        err: e,
+                        pos
+                    };
+                }
+            }
+
+            function caretSnippet(text, pos) {
+                if (pos == null || isNaN(pos)) return "";
+                const start = Math.max(0, pos - 60);
+                const end = Math.min(text.length, pos + 60);
+                const frag = text.slice(start, end);
+                const pointer = " ".repeat(pos - start) + "↑";
+                return frag + "\n" + pointer;
+            }
+
+            function stableKeySort(value) {
+                if (Array.isArray(value)) return value.map(stableKeySort);
+                if (value && typeof value === "object") {
+                    const out = {};
+                    Object.keys(value).sort((a, b) => a.localeCompare(b)).forEach(k => {
+                        out[k] = stableKeySort(value[k]);
+                    });
+                    return out;
+                }
+                return value;
+            }
+
+            function prettyString(obj) {
+                // keys sorted
+                const sorted = stableKeySort(obj);
+                return JSON.stringify(sorted, null, 2);
+            }
+
+            function minifyString(obj) {
+                return JSON.stringify(obj);
+            }
+
+            function escapeHtml(s) {
+                return String(s)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+
+            function highlight(text, q) {
+                if (!q) return escapeHtml(text);
+                const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const re = new RegExp(safeQ, "gi");
+                return escapeHtml(text).replace(re, m => `<mark>${m}</mark>`);
+            }
+
+            function typeClass(v) {
+                if (v === null) return "null";
+                if (Array.isArray(v)) return "t";
+                switch (typeof v) {
+                    case "string":
+                        return "s";
+                    case "number":
+                        return "n";
+                    case "boolean":
+                        return "b";
+                    case "object":
+                        return "t";
+                    default:
+                        return "t";
+                }
+            }
+
+            function renderLeaf(v, q) {
+                const cls = typeClass(v);
+                if (typeof v === "string") return `<span class="${cls}">"${highlight(v, q)}"</span>`;
+                if (v === null) return `<span class="${cls}">null</span>`;
+                return `<span class="${cls}">${highlight(String(v), q)}</span>`;
+            }
+
+            function buildNode(value, key, q) {
+                const isArr = Array.isArray(value);
+                const isObj = value && typeof value === "object" && !isArr;
+
+                const labelKey = (key === null || key === undefined) ? "" :
+                    `<span class="k">"${highlight(String(key), q)}"</span>: `;
+
+                if (!isObj && !isArr) {
+                    return `<div class="item">${labelKey}${renderLeaf(value, q)}</div>`;
+                }
+
+                const keys = isArr ? value.map((_, i) => i) : Object.keys(value).sort((a, b) => a.localeCompare(b));
+                const count = keys.length;
+                const headType = isArr ? "Array" : "Object";
+                const summary = `<span class="t">${headType}</span> <span class="pill">${count}</span>`;
+
+                const id = "n_" + Math.random().toString(16).slice(2);
+                const caretCls = expanded ? "caret open" : "caret";
+                const bodyStyle = expanded ? "" : "display:none;";
+
+                let childrenHtml = "";
+                for (const k of keys) {
+                    const child = isArr ? value[k] : value[k];
+                    const childKey = isArr ? `[${k}]` : k;
+                    childrenHtml += buildNode(child, childKey, q);
+                }
+
+                return `
+      <div class="item">
+        <span class="toggle" data-target="${id}">
+          <span class="${caretCls}"></span>
+          ${labelKey}${summary}
+        </span>
+        <div id="${id}" class="node" style="${bodyStyle}">
+          ${childrenHtml}
+        </div>
+      </div>
+    `;
+            }
+
+            function renderAll(obj) {
+                const pretty = prettyString(obj);
+                $pretty.text(pretty);
+                $tree.html(buildNode(stableKeySort(obj), null, $q.val().trim()));
+                setStatus(true, "파싱 성공 ✅");
+            }
+
+            function doParse() {
+                const raw = $in.val().trim();
+                if (!raw) {
+                    lastObj = null;
+                    $pretty.text("");
+                    $tree.html("");
+                    setStatus(false, "입력이 비어있어요.");
+                    return;
+                }
+
+                const r = parseWithNiceError(raw);
+                if (!r.ok) {
+                    const msg = "JSON 파싱 실패 ❌  " + ((r.err && r.err.message) ? r.err.message : r.err);
+                    setStatus(false, msg);
+                    const hint = caretSnippet(raw, r.pos);
+                    $pretty.text(hint ? hint : "");
+                    $tree.html("");
+                    lastObj = null;
+                    return;
+                }
+
+                lastObj = r.obj;
+                renderAll(lastObj);
+            }
+
+            async function copyToClipboard(text) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    setStatus(true, "클립보드 복사 완료 📋");
+                } catch (e) {
+                    // fallback
+                    const ta = document.createElement("textarea");
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    setStatus(true, "클립보드 복사 완료 📋");
+                }
+            }
+
+            // Events
+            $("#btnParse").on("click", doParse);
+
+            // 자동 파싱(타이핑 멈추면)
+            let t = null;
+            $in.on("input", function() {
+                clearTimeout(t);
+                t = setTimeout(doParse, 250);
+            });
+
+            $("#btnClear").on("click", function() {
+                $in.val("");
+                $pretty.text("");
+                $tree.html("");
+                $q.val("");
+                lastObj = null;
+                setStatus(true, "초기화됨");
+            });
+
+            $("#btnSample").on("click", function() {
+                const sample = {
+                    userId: 123,
+                    name: "Sein",
+                    active: true,
+                    meta: {
+                        createdAt: "2026-02-05T13:00:00+09:00",
+                        tags: ["kr", "json", "viewer"]
+                    },
+                    items: [{
+                        id: 1,
+                        price: 10.5,
+                        note: null
+                    }, {
+                        id: 2,
+                        price: 7.0,
+                        note: "hello"
+                    }]
+                };
+                $in.val(JSON.stringify(sample));
+                doParse();
+            });
+
+            $("#btnMinify").on("click", function() {
+                if (!lastObj) {
+                    setStatus(false, "먼저 파싱하세요.");
+                    return;
+                }
+                $pretty.text(minifyString(lastObj));
+                setStatus(true, "Minify 표시");
+            });
+
+            $("#btnCopyPretty").on("click", function() {
+                if (!lastObj) {
+                    setStatus(false, "먼저 파싱하세요.");
+                    return;
+                }
+                copyToClipboard(prettyString(lastObj));
+            });
+
+            $("#btnCopyMin").on("click", function() {
+                if (!lastObj) {
+                    setStatus(false, "먼저 파싱하세요.");
+                    return;
+                }
+                copyToClipboard(minifyString(lastObj));
+            });
+
+            $("#btnExpand").on("click", function() {
+                expanded = true;
+                if (lastObj) renderAll(lastObj);
+            });
+            $("#btnCollapse").on("click", function() {
+                expanded = false;
+                if (lastObj) renderAll(lastObj);
+            });
+
+            $q.on("input", function() {
+                if (!lastObj) return;
+                renderAll(lastObj);
+            });
+
+            $tree.on("click", ".toggle", function() {
+                const target = $(this).data("target");
+                const $caret = $(this).find(".caret");
+                const $body = $("#" + target);
+                const isOpen = $body.is(":visible");
+                $body.toggle(!isOpen);
+                $caret.toggleClass("open", !isOpen);
+            });
+
+            $("#file").on("change", function(e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function() {
+                    $in.val(String(reader.result || ""));
+                    doParse();
+                };
+                reader.readAsText(file, "utf-8");
+            });
+
+            // initial
+            setStatus(true, "JSON을 입력하면 자동 파싱됩니다.");
+        })();
+    </script>
+</body>
+
+</html>
