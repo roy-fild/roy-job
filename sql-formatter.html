@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>MyBatis SQL Formatter (Leading Comma Everywhere)</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+            margin: 18px;
+        }
+        
+        .row {
+            display: flex;
+            gap: 14px;
+        }
+        
+        .col {
+            flex: 1;
+            min-width: 320px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 480px;
+            padding: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 12.5px;
+            line-height: 1.45;
+            border: 1px solid #cfcfcf;
+            border-radius: 10px;
+        }
+        
+        .btns {
+            margin: 10px 0 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        
+        button.primary {
+            background: #111;
+            color: #fff;
+        }
+        
+        button.gray {
+            background: #efefef;
+        }
+        
+        .hint {
+            color: #555;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2 style="margin:0 0 6px;">MyBatis SQL Formatter</h2>
+    <div class="btns">
+        <button class="primary" id="btnFormat">FORMAT</button>
+        <button class="gray" id="btnCopy">COPY OUTPUT</button>
+        <button class="gray" id="btnSwap">SWAP</button>
+        <button class="gray" id="btnClear">CLEAR</button>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <h3 style="margin:0 0 8px;">Input</h3>
+            <textarea id="inArea" spellcheck="false"></textarea>
+            <div class="hint">MyBatis XML 통째로 넣어도 OK. 주석/파라미터/CDATA/XML은 보호하고 SQL만 정리.</div>
+        </div>
+        <div class="col">
+            <h3 style="margin:0 0 8px;">Output</h3>
+            <textarea id="outArea" spellcheck="false" readonly></textarea>
+            <div class="hint">SELECT / INSERT / UPDATE 항목 리스트를 전부 “줄 맨 앞 콤마”로 강제.</div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+
+            // -------------------- 보호/복원 --------------------
+            function protectAll(src) {
+                const bag = [];
+                let s = src;
+
+                // ${...} / #{...}
+                s = s.replace(/(\$\{[^}]*\}|\#\{[^}]*\})/g, (m) => {
+                    const k = `__TOK_${bag.length}__`;
+                    bag.push(m);
+                    return k;
+                });
+
+                // CDATA
+                s = s.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, (m) => {
+                    const k = `__TOK_${bag.length}__`;
+                    bag.push(m);
+                    return k;
+                });
+
+                // block comments
+                s = s.replace(/\/\*[\s\S]*?\*\//g, (m) => {
+                    const k = `__TOK_${bag.length}__`;
+                    bag.push(m);
+                    return k;
+                });
+
+                // line comments
+                s = s.replace(/--[^\n\r]*/g, (m) => {
+                    const k = `__TOK_${bag.length}__`;
+                    bag.push(m);
+                    return k;
+                });
+
+                // XML tags
+                s = s.replace(/<[^>]+>/g, (m) => {
+                    const k = `__TOK_${bag.length}__`;
+                    bag.push(m);
+                    return k;
+                });
+
+                return {
+                    text: s,
+                    bag
+                };
+            }
+
+            function unprotectAll(text, bag) {
+                let out = text;
+                for (let i = 0; i < bag.length; i++) out = out.split(`__TOK_${i}__`).join(bag[i]);
+                return out;
+            }
+
+            // -------------------- 대문자화 --------------------
+            function upperCaseSqlLoose(s) {
+                const keywords = [
+                    "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "EXISTS", "JOIN", "INNER", "LEFT", "RIGHT", "FULL", "OUTER", "ON",
+                    "GROUP", "BY", "ORDER", "HAVING", "UNION", "ALL", "DISTINCT", "AS", "CASE", "WHEN", "THEN", "ELSE", "END",
+                    "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE",
+                    "NULL", "IS", "LIKE", "BETWEEN", "LIMIT", "OFFSET",
+                    "NOW", "CURRENT_TIMESTAMP", "TO_TIMESTAMP", "CAST", "TRUNC", "COALESCE", "NVL"
+                ];
+                keywords.forEach(k => s = s.replace(new RegExp("\\b" + k + "\\b", "gi"), k));
+
+                // identifiers (XML/주석/토큰/CDATA는 이미 보호됨)
+                s = s.replace(/\b[a-z_][a-z0-9_]*\b/gi, (m) => {
+                    if (/^(true|false)$/i.test(m)) return m;
+                    return m.toUpperCase();
+                });
+
+                return s;
+            }
+
+            // -------------------- 별칭 A/B/C --------------------
+            function buildAliasMap(sql) {
+                const map = new Map();
+                let idx = 0;
+                const nextAlias = () => String.fromCharCode("A".charCodeAt(0) + (idx++));
+
+                // FROM/JOIN
+                const re = /\b(FROM|JOIN)\s+([A-Z0-9_\."]+)\s+([A-Z][A-Z0-9_]*)\b/g;
+                let m;
+                while ((m = re.exec(sql)) !== null) {
+                    const alias = m[3];
+                    if (/^(WHERE|ON|INNER|LEFT|RIGHT|FULL|CROSS|GROUP|ORDER|HAVING|UNION|AND|OR)$/i.test(alias)) continue;
+                    if (!map.has(alias)) map.set(alias, nextAlias());
+                }
+
+                // comma join
+                const fromToWhere = sql.match(/\bFROM\b([\s\S]*?)\bWHERE\b/i);
+                if (fromToWhere && fromToWhere[1]) {
+                    const part = fromToWhere[1];
+                    const re2 = /([A-Z0-9_\."]+)\s+([A-Z][A-Z0-9_]*)\b/g;
+                    let n;
+                    while ((n = re2.exec(part)) !== null) {
+                        const alias = n[2];
+                        if (/^(WHERE|ON|INNER|LEFT|RIGHT|FULL|CROSS|GROUP|ORDER|HAVING|UNION|AND|OR)$/i.test(alias)) continue;
+                        if (!map.has(alias)) map.set(alias, nextAlias());
+                    }
+                }
+                return map;
+            }
+
+            function applyAliasMap(sql, aliasMap) {
+                let out = sql;
+
+                // qualifier GRD. -> A.
+                aliasMap.forEach((to, from) => {
+                    out = out.replace(new RegExp("\\b" + from + "\\.", "g"), to + ".");
+                });
+
+                // alias definition after table name
+                aliasMap.forEach((to, from) => {
+                    out = out.replace(new RegExp("(\\bFROM\\s+[A-Z0-9_\\.\\\"]+\\s+)" + from + "\\b", "g"), "$1" + to);
+                    out = out.replace(new RegExp("(\\bJOIN\\s+[A-Z0-9_\\.\\\"]+\\s+)" + from + "\\b", "g"), "$1" + to);
+                    out = out.replace(new RegExp("(,\\s*[A-Z0-9_\\.\\\"]+\\s+)" + from + "\\b", "g"), "$1" + to);
+                });
+
+                return out;
+            }
+
+            // -------------------- 공통: 리스트 파싱 & 선행 콤마로 재조립 --------------------
+            function splitTopLevelComma(listStr) {
+                const items = [];
+                let cur = "";
+                let depth = 0;
+                let inQuote = false;
+
+                for (let i = 0; i < listStr.length; i++) {
+                    const ch = listStr[i];
+
+                    if (ch === "'") {
+                        inQuote = !inQuote;
+                        cur += ch;
+                        continue;
+                    }
+
+                    if (!inQuote) {
+                        if (ch === "(") depth++;
+                        if (ch === ")") depth = Math.max(0, depth - 1);
+                        if (ch === "," && depth === 0) {
+                            items.push(cur);
+                            cur = "";
+                            continue;
+                        }
+                    }
+                    cur += ch;
+                }
+                items.push(cur);
+
+                // 🔥 핵심: 항목 양끝 콤마를 싹 제거해서 "COLUMN ," 같은 후행 콤마 방지
+                return items
+                    .map(x => x.replace(/^[\s,]+/, "").replace(/[\s,]+$/, "").trim())
+                    .filter(Boolean);
+            }
+
+            function buildLeadingCommaLines(items, indentFirst, indentComma) {
+                const lines = [];
+                items.forEach((it, i) => {
+                    if (i === 0) lines.push(indentFirst + it);
+                    else lines.push(indentComma + ", " + it);
+                });
+                return lines;
+            }
+
+            // -------------------- SELECT: SELECT ... FROM 사이 --------------------
+            function formatSelect(sql) {
+                const m = sql.match(/\bSELECT\b([\s\S]*?)\bFROM\b/i);
+                if (!m) return sql;
+
+                const selectBody = m[1];
+                const selectStart = m.index;
+                const fromPos = selectStart + m[0].toUpperCase().lastIndexOf("FROM");
+
+                const before = sql.slice(0, selectStart);
+                const afterFrom = sql.slice(fromPos); // FROM 포함
+
+                const items = splitTopLevelComma(selectBody);
+                const indentFirst = "           ";
+                const indentComma = "         ";
+
+                const out = [];
+                out.push("SELECT");
+                out.push(...buildLeadingCommaLines(items, indentFirst, indentComma));
+
+                return before + out.join("\n") + "\n" + afterFrom;
+            }
+
+            // -------------------- INSERT: (컬럼리스트) + VALUES(값리스트) --------------------
+            function formatInsert(sql) {
+                // INSERT INTO T (...) VALUES (...)
+                // 1) 컬럼 리스트 괄호
+                sql = sql.replace(/\bINSERT\s+INTO\b([\s\S]*?)\)\s*\bVALUES\b/gi, (whole) => {
+                    // whole includes "... INSERT INTO ... ) VALUES"
+                    // Find first "(" after INSERT INTO and the matching ")" before VALUES (simple, best-effort)
+                    const idxParen = whole.indexOf("(");
+                    if (idxParen < 0) return whole;
+
+                    const head = whole.slice(0, idxParen); // "INSERT INTO ... "
+                    const rest = whole.slice(idxParen + 1); // "col1, col2) VALUES..."
+                    const idxClose = rest.lastIndexOf(")");
+                    if (idxClose < 0) return whole;
+
+                    const colsRaw = rest.slice(0, idxClose);
+                    const tail = rest.slice(idxClose); // ") VALUES..."
+
+                    const cols = splitTopLevelComma(colsRaw);
+                    const indentFirst = "           ";
+                    const indentComma = "         ";
+                    const lines = buildLeadingCommaLines(cols, indentFirst, indentComma).join("\n");
+
+                    return head + "(\n" + lines + "\n" + indentFirst.slice(0, 0) + tail; // keep tail ") VALUES..."
+                });
+
+                // 2) VALUES (...) 리스트 (괄호 안)
+                sql = sql.replace(/\bVALUES\s*\(([\s\S]*?)\)/gi, (whole, inside) => {
+                    const vals = splitTopLevelComma(inside);
+                    const indentFirst = "           ";
+                    const indentComma = "         ";
+                    const lines = buildLeadingCommaLines(vals, indentFirst, indentComma).join("\n");
+                    return "VALUES (\n" + lines + "\n)";
+                });
+
+                return sql;
+            }
+
+            // -------------------- UPDATE: SET a=1, b=2 ... (WHERE 전까지) --------------------
+            function formatUpdate(sql) {
+                const m = sql.match(/\bUPDATE\b[\s\S]*?\bSET\b([\s\S]*?)(\bWHERE\b[\s\S]*)?$/i);
+                if (!m) return sql;
+
+                const setBody = m[1];
+                const wherePart = m[2] || "";
+
+                // setBody 안에서 항목 split
+                const items = splitTopLevelComma(setBody);
+
+                const indentFirst = "     "; // SET 다음 줄 들여쓰기 취향
+                const indentComma = "     ";
+
+                const lines = [];
+                lines.push("SET");
+                lines.push(...buildLeadingCommaLines(items, indentFirst + "      ", indentComma + "    ")); // 조금 더 예쁘게
+
+                // UPDATE ~ SET 까지 앞부분 유지
+                const prefix = sql.slice(0, sql.toUpperCase().indexOf("SET"));
+                return prefix + lines.join("\n") + (wherePart ? "\n" + wherePart.trimStart() : "");
+            }
+
+            // -------------------- 절/AND 정렬 --------------------
+            function formatClauses(sql) {
+                let s = sql;
+
+                // 절 앞 줄바꿈 (이미 줄바꿈 있어도 안전)
+                const clause = ["FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY"];
+                clause.forEach(c => {
+                    const re = new RegExp("\\s+\\b" + c.replace(" ", "\\s+") + "\\b", "g");
+                    s = s.replace(re, "\n" + c);
+                });
+
+                // AND/OR 줄바꿈
+                s = s.replace(/\s+\bAND\b\s+/g, "\n     AND ");
+                s = s.replace(/\s+\bOR\b\s+/g, "\n      OR ");
+
+                // ON 줄바꿈
+                s = s.replace(/\s+\bON\b\s+/g, "\n      ON ");
+
+                // FROM 콤마조인 줄바꿈 (테이블리스트)
+                s = s.replace(/\bFROM\b([\s\S]*?)(\bWHERE\b|\bGROUP\b|\bORDER\b|\bHAVING\b|$)/i, (whole, fromPart, next) => {
+                    const rebuilt = fromPart.replace(/\s*,\s*/g, ",\n             ");
+                    return "FROM" + rebuilt + (next || "");
+                });
+
+                // 공백 정리
+                s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+
+                return s;
+            }
+
+            // -------------------- Main --------------------
+            function formatMyBatisXml(input) {
+                const {
+                    text,
+                    bag
+                } = protectAll(input);
+
+                let s = text;
+                s = upperCaseSqlLoose(s);
+
+                const aliasMap = buildAliasMap(s);
+                s = applyAliasMap(s, aliasMap);
+
+                // DML/SELECT 순서대로 포맷
+                s = formatSelect(s);
+                s = formatInsert(s);
+                s = formatUpdate(s);
+
+                s = formatClauses(s);
+
+                return unprotectAll(s, bag);
+            }
+
+            // -------------------- UI --------------------
+            $("#btnFormat").on("click", function() {
+                $("#outArea").val(formatMyBatisXml($("#inArea").val()));
+            });
+
+            $("#btnCopy").on("click", async function() {
+                const v = $("#outArea").val();
+                if (!v) return;
+                try {
+                    await navigator.clipboard.writeText(v);
+                    alert("복사 완료!");
+                } catch (e) {
+                    $("#outArea").focus().select();
+                    document.execCommand("copy");
+                    alert("복사 완료!");
+                }
+            });
+
+            $("#btnSwap").on("click", function() {
+                const a = $("#inArea").val();
+                const b = $("#outArea").val();
+                $("#inArea").val(b);
+                $("#outArea").val(a);
+            });
+
+            $("#btnClear").on("click", function() {
+                $("#inArea").val("");
+                $("#outArea").val("");
+            });
+
+        })();
+    </script>
+</body>
+
+</html>
